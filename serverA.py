@@ -28,11 +28,10 @@ def login():
         # Thiết lập payload cho refresh token
         refresh_token_payload = {'username': username}
         access_token_expires = datetime.timedelta(minutes=15)  # Thời gian hết hạn: 15 phút
-        access_token = create_access_token(identity=username, additional_claims=access_token_payload, expires_delta=access_token_expires)
+        access_token = create_access_token(identity=username, additional_claims=access_token_payload, expires_delta=access_token_expires, fresh=True)
         refresh_token = create_refresh_token(identity=username, additional_claims=refresh_token_payload)
         token = {
             "username": username,
-            "password": password,
             "access_token": access_token,
             "refresh_token": refresh_token
         }
@@ -41,6 +40,27 @@ def login():
         return jsonify({'access_token': access_token, 'refresh_token': refresh_token}), 200
     
     return jsonify({'message': 'Invalid username or password'}), 401
+
+
+# Refresh access token bằng refresh token
+@app.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    current_user = get_jwt_identity()
+    access_token_payload = {'username': current_user, 'role': 'admin'}
+    access_token_expires = datetime.timedelta(minutes=15)  # Thời gian hết hạn: 15 phút
+    access_token = create_access_token(identity=current_user, additional_claims=access_token_payload, expires_delta=access_token_expires, fresh=False)
+    refresh_token = create_refresh_token(identity=current_user, additional_claims=access_token_payload)
+    token = {
+        "username": current_user,
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }
+    fire = FirestoreCollection("tokens")
+    fire.update_data(current_user, token)
+    return jsonify({'access_token': access_token, 'refresh_token': refresh_token}), 200
+
+
 
 # Tuyến đường /protected
 @app.route('/protected', methods=['GET'])

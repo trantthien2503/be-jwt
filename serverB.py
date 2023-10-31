@@ -1,32 +1,42 @@
-from flask import Flask, jsonify
+from flask import Flask, Response, request, jsonify
+from flask_cors import CORS
+from firebase_service import FirestoreCollection
 
 app = Flask(__name__)
+CORS(app, support_credentials=True)
 
-# Tuyến đường /bactors
-@app.route('/bactors', methods=['GET'])
-def get_bactors():
-    # Xử lý yêu cầu API để lấy danh sách diễn viên
-    actors = [
-        {'name': 'Actor 1', 'age': 30},
-        {'name': 'Actor 2', 'age': 35},
-        {'name': 'Actor 3', 'age': 40}
-    ]
+@app.route('/content', methods=['POST'])
+def content():
+    if request.headers['Content-Type'] != 'application/json':
+        return Response('Unsupported Media Type', status=415)
+    text = request.get_json().get('content')
+    content = {
+        "content": text,
+    }
+    fire = FirestoreCollection("content")
+    update_data = fire.update_data("oHPGhzaABpTSzbglG1in",content)
+    response_data = {"data": update_data}
+    return jsonify(response_data)
 
-    # Trả về kết quả danh sách diễn viên cho ServerA
-    return jsonify(actors), 200
+@app.route('/get-content', methods=['GET'])
+def getContent():
+    if request.headers['Content-Type'] != 'application/json':
+        return Response('Unsupported Media Type', status=415)
+    fire = FirestoreCollection("content")
+    all_data = fire.get_all_data()
+    response_data = {"data": all_data['data'][0]['content']}
+    return jsonify(response_data)
 
-# Tuyến đường /bfilms
-@app.route('/bfilms', methods=['GET'])
-def get_bfilms():
-    # Xử lý yêu cầu API để lấy danh sách phim
-    films = [
-        {'title': 'Film 1', 'year': 2010},
-        {'title': 'Film 2', 'year': 2015},
-        {'title': 'Film 3', 'year': 2020}
-    ]
 
-    # Trả về kết quả danh sách phim cho ServerA
-    return jsonify(films), 200
+@app.route('/stream')
+def stream():
+    def generate():
+        fire = FirestoreCollection("content")
+        all_data = fire.get_all_data()
+        yield f"data: {all_data['data'][0]['content']}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
-    app.run(port=5001)
+    
+    app.run(debug=True)
